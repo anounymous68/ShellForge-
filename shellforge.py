@@ -130,13 +130,21 @@ def _print_banner() -> None:
 
 
 def _print_payload(label: str, payload: str) -> None:
+    """
+    Print a copy-safe payload.
+
+    Labels may use rich styling; the payload itself is always plain text
+    with no box borders so mouse-select + copy grabs only the payload.
+    """
     if RICH and console:
         console.print(f"[bold cyan][{label}][/]")
-        console.print(Panel(payload, border_style="green", expand=False))
+        console.print("[dim]Payload (copy the line below):[/]")
     else:
         print(f"[{label}]")
-        print(payload)
-        print()
+        print("Payload (copy the line below):")
+    # Plain stdout — no rich markup, no Panel, no decoration
+    print(payload)
+    print()
 
 
 def _warn(msg: str) -> None:
@@ -212,6 +220,8 @@ def build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Examples:\n"
+            "  python shellforge.py\n"
+            "  python shellforge.py -m\n"
             "  python shellforge.py -t reverse -i 10.10.14.5 -p 4444 -l bash\n"
             "  python shellforge.py -t bind -p 5555 -l python3 --listener\n"
             "  python shellforge.py -t reverse -i 10.10.14.5 -p 443 -l powershell -o rev.ps1\n"
@@ -258,6 +268,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Print matching listener commands for this port/type",
     )
     parser.add_argument(
+        "-m",
+        "--interactive",
+        action="store_true",
+        help="Launch interactive menu mode",
+    )
+    parser.add_argument(
         "--list-langs",
         action="store_true",
         help="List all supported languages and exit",
@@ -276,8 +292,24 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Optional[list[str]] = None) -> int:
+    raw_argv = list(sys.argv[1:] if argv is None else argv)
+
+    # No flags at all → interactive menu (portfolio-friendly default)
+    if len(raw_argv) == 0:
+        from interactive import run_interactive
+
+        return run_interactive(show_banner=True, sf=sys.modules[__name__])
+
     parser = build_parser()
-    args = parser.parse_args(argv)
+    args = parser.parse_args(raw_argv)
+
+    if args.interactive:
+        from interactive import run_interactive
+
+        return run_interactive(
+            show_banner=not args.no_banner,
+            sf=sys.modules[__name__],
+        )
 
     if not args.no_banner and not args.list_langs:
         _print_banner()
@@ -287,7 +319,10 @@ def main(argv: Optional[list[str]] = None) -> int:
         return 0
 
     if args.type is None or args.port is None:
-        parser.error("--type/-t and --port/-p are required (unless --list-langs)")
+        parser.error(
+            "--type/-t and --port/-p are required "
+            "(or run with no args / --interactive for the menu)"
+        )
 
     if args.type == "reverse" and not args.ip:
         parser.error("--ip/-i is required for reverse shells")
