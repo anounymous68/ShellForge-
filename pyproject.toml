@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "shellforge"
+version = "1.0.0"
+description = "Reverse and bind shell payload generator for authorized penetration testing"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [
+    { name = "Mostafa Tamime" }
+]
+requires-python = ">=3.9"
+dependencies = [
+    "rich>=13.0.0",
+    "colorama>=0.4.6",
+]
+keywords = [
+    "pentest",
+    "red-team",
+    "reverse-shell",
+    "bind-shell",
+    "payload-generator",
+    "cybersecurity",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Information Technology",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Security",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0.0"]
+
+[project.scripts]
+shellforge = "shellforge:main"
+
+[tool.setuptools]
+py-modules = ["shellforge"]
+packages = ["generators", "encoders", "listeners"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
