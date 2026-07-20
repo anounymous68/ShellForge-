@@ -83,6 +83,26 @@ python shellforge.py --list-langs
 
 More walkthroughs live in [`examples/usage_examples.md`](examples/usage_examples.md).
 
+## Demo
+
+Tested end-to-end on a lab setup: Kali (attacker) + a Windows target VM, generating a PowerShell reverse shell through the interactive menu and catching it with netcat.
+
+**Interactive mode — selecting shell type and options**
+
+![Interactive menu](docs/screenshots/01-interactive-menu.png)
+
+**Generated PowerShell reverse shell payload with listener commands**
+
+![Payload and listener output](docs/screenshots/02-payload-output.png)
+
+**Payload pasted into a live PowerShell session on the target**
+
+![Payload executed on target](docs/screenshots/03-payload-executed.png)
+
+**Shell caught — running `whoami /priv` on the target through the reverse connection**
+
+![Reverse shell session](docs/screenshots/04-shell-session.png)
+
 ## Project structure
 
 ```
@@ -92,6 +112,7 @@ shellforge/
 ├── encoders/encode.py
 ├── listeners/listener_helper.py
 ├── assets/logo.svg
+├── docs/screenshots/      # demo screenshots
 ├── tests/
 └── examples/
 ```
