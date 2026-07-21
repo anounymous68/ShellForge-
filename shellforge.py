@@ -1,7 +1,7 @@
 """
-ShellForge — reverse & bind shell payload generator CLI.
+ShellForge — reverse, bind & web shell payload generator CLI.
 
-Authorized penetration testing / red team / CTF use only.
+Authorized penetration testing / red team / CTF / learning use only.
 
 Author: Mostafa Tamime
 """
@@ -29,6 +29,12 @@ from generators.python_lang import Python3Generator, PythonGenerator
 from generators.ruby_lang import RubyGenerator
 from generators.powershell import PowershellGenerator
 from generators.socat import SocatGenerator
+from generators.webshell import (
+    WEBSHELL_LANGS,
+    WebShellGenerator,
+    get_webshell_generator,
+    list_webshell_languages,
+)
 from listeners.listener_helper import print_listeners
 
 try:
@@ -43,9 +49,11 @@ except ImportError:  # pragma: no cover
 
 LEGAL_DISCLAIMER = (
     "AUTHORIZED USE ONLY — ShellForge is intended solely for authorized "
-    "security testing, red team engagements, CTF competitions, and lab "
-    "environments. Unauthorized use against systems you do not own or lack "
-    "explicit written permission to test is illegal."
+    "security testing, red team engagements, CTF competitions, lab "
+    "environments, and learning. Unauthorized use against systems you do "
+    "not own or lack explicit written permission to test is illegal. "
+    "Web shells (php, asp, aspx, jsp, etc.) require write access to a "
+    "target web root and are for authorized testing only."
 )
 
 AUTHOR = "Mostafa Tamime"
@@ -84,6 +92,11 @@ LANGUAGES: dict[str, PayloadGenerator] = {
     "golang": GolangGenerator(),
     "lua": LuaGenerator(),
     "awk": AwkGenerator(),
+}
+
+# Web shell registry (separate type: -t webshell)
+WEBSHELL_LANGUAGES: dict[str, WebShellGenerator] = {
+    name: WebShellGenerator(name) for name in WEBSHELL_LANGS
 }
 
 # Languages that prefer multi-line file output when --output is given
@@ -161,15 +174,35 @@ def _ok(msg: str) -> None:
         print(f"[+] {msg}")
 
 
-def list_languages() -> None:
-    """Print supported language keys."""
+def list_languages(shell_type: Optional[str] = None) -> None:
+    """Print supported language keys for reverse/bind or webshell."""
+    if shell_type == "webshell":
+        langs = list_webshell_languages()
+        if RICH and console:
+            console.print("[bold]Supported webshell languages:[/]")
+            console.print(", ".join(langs))
+        else:
+            print("Supported webshell languages:")
+            print(", ".join(langs))
+        return
+
     langs = sorted(LANGUAGES.keys())
     if RICH and console:
-        console.print("[bold]Supported languages:[/]")
+        console.print("[bold]Supported languages (reverse/bind):[/]")
         console.print(", ".join(langs) + ", all")
+        console.print(
+            "[bold]Webshell languages:[/] "
+            + ", ".join(list_webshell_languages())
+            + "  (use: -t webshell --list-langs)"
+        )
     else:
-        print("Supported languages:")
+        print("Supported languages (reverse/bind):")
         print(", ".join(langs) + ", all")
+        print(
+            "Webshell languages: "
+            + ", ".join(list_webshell_languages())
+            + "  (use: -t webshell --list-langs)"
+        )
 
 
 def get_payload(
@@ -200,6 +233,15 @@ def get_payload(
     raise ValueError(f"Unknown shell type: {shell_type}")
 
 
+def get_webshell_payload(
+    lang: str,
+    variant: str = "minimal",
+) -> tuple[str, WebShellGenerator]:
+    """Generate a web shell payload for *lang*."""
+    generator = get_webshell_generator(lang)
+    return generator.generate(variant), generator
+
+
 def save_payload(path: Path, payload: str, extension: str) -> Path:
     """Write payload to *path*, appending *extension* if path has no suffix."""
     out = path
@@ -214,7 +256,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="shellforge",
         description=(
-            "ShellForge — reverse & bind shell payload generator "
+            "ShellForge — reverse, bind & web shell payload generator "
             f"(Author: {AUTHOR})"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -224,15 +266,15 @@ def build_parser() -> argparse.ArgumentParser:
             "  python shellforge.py -m\n"
             "  python shellforge.py -t reverse -i 10.10.14.5 -p 4444 -l bash\n"
             "  python shellforge.py -t bind -p 5555 -l python3 --listener\n"
-            "  python shellforge.py -t reverse -i 10.10.14.5 -p 443 -l powershell -o rev.ps1\n"
-            "  python shellforge.py --list-langs\n"
+            "  python shellforge.py -t webshell -l php --variant full -o shell.php\n"
+            "  python shellforge.py -t webshell --list-langs\n"
         ),
     )
     parser.add_argument(
         "-t",
         "--type",
-        choices=["reverse", "bind"],
-        help="Shell type: reverse or bind",
+        choices=["reverse", "bind", "webshell"],
+        help="Shell type: reverse, bind, or webshell",
     )
     parser.add_argument(
         "-i",
@@ -243,13 +285,19 @@ def build_parser() -> argparse.ArgumentParser:
         "-p",
         "--port",
         type=int,
-        help="Port number (required for payload generation)",
+        help="Port number (required for reverse/bind)",
     )
     parser.add_argument(
         "-l",
         "--lang",
-        default="bash",
+        default=None,
         help="Language/tool (or 'all'). Use --list-langs to see options.",
+    )
+    parser.add_argument(
+        "--variant",
+        choices=["minimal", "full"],
+        default="minimal",
+        help="Webshell variant: minimal (one-liner) or full (browser form)",
     )
     parser.add_argument(
         "--encode",
@@ -260,7 +308,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "-o",
         "--output",
-        help="Optional file path to save the payload",
+        help="File path to save the payload (recommended for webshells)",
     )
     parser.add_argument(
         "--listener",
@@ -276,7 +324,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--list-langs",
         action="store_true",
-        help="List all supported languages and exit",
+        help="List supported languages (webshell langs if -t webshell)",
     )
     parser.add_argument(
         "--no-banner",
@@ -289,6 +337,53 @@ def build_parser() -> argparse.ArgumentParser:
         version=f"ShellForge {VERSION} by {AUTHOR}",
     )
     return parser
+
+
+def _run_webshell(args: argparse.Namespace) -> int:
+    """Handle -t webshell generation path."""
+    lang_key = (args.lang or "php").lower()
+    if lang_key == "all":
+        targets = list(WEBSHELL_LANGUAGES.keys())
+    elif lang_key in WEBSHELL_LANGUAGES:
+        targets = [lang_key]
+    else:
+        _warn(
+            f"Unknown webshell language '{args.lang}'. "
+            "Use: python shellforge.py -t webshell --list-langs"
+        )
+        return 1
+
+    if args.output is None and lang_key != "all":
+        _warn("Tip: web shells are usually saved with -o / --output (e.g. -o shell.php)")
+
+    output_path = Path(args.output) if args.output else None
+
+    for name in targets:
+        try:
+            payload, generator = get_webshell_payload(name, args.variant)
+            payload = apply_encoding(payload, args.encode)
+        except Exception as exc:  # noqa: BLE001
+            _warn(f"{name}: {exc}")
+            continue
+
+        label = f"WEBSHELL | {name} | variant={args.variant}"
+        if args.encode != "none":
+            label += f" | encode={args.encode}"
+
+        if output_path and lang_key != "all":
+            saved = save_payload(output_path, payload, generator.file_extension())
+            _ok(f"Web shell written to {saved}")
+            _print_payload(label, payload)
+        elif output_path and lang_key == "all":
+            stem = output_path.stem or "webshell"
+            parent = output_path.parent
+            per_file = parent / f"{stem}_{name}{generator.file_extension()}"
+            per_file.write_text(payload, encoding="utf-8")
+            _ok(f"{name} -> {per_file}")
+        else:
+            _print_payload(label, payload)
+
+    return 0
 
 
 def main(argv: Optional[list[str]] = None) -> int:
@@ -315,19 +410,25 @@ def main(argv: Optional[list[str]] = None) -> int:
         _print_banner()
 
     if args.list_langs:
-        list_languages()
+        list_languages(shell_type=args.type)
         return 0
 
-    if args.type is None or args.port is None:
+    if args.type is None:
         parser.error(
-            "--type/-t and --port/-p are required "
+            "--type/-t is required "
             "(or run with no args / --interactive for the menu)"
         )
+
+    if args.type == "webshell":
+        return _run_webshell(args)
+
+    if args.port is None:
+        parser.error("--port/-p is required for reverse/bind shells")
 
     if args.type == "reverse" and not args.ip:
         parser.error("--ip/-i is required for reverse shells")
 
-    lang_key = args.lang.lower()
+    lang_key = (args.lang or "bash").lower()
     if lang_key == "all":
         targets = list(LANGUAGES.items())
     elif lang_key in LANGUAGES:

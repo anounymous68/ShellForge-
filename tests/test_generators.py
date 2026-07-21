@@ -213,3 +213,119 @@ def test_main_empty_argv_starts_interactive(monkeypatch) -> None:
     rc = sf.main([])
     assert rc == 0
     assert called.get("ok") is True
+
+
+def test_main_m_flag_starts_interactive(monkeypatch) -> None:
+    """The explicit -m flag should enter interactive mode."""
+    import interactive as interactive_mod
+    import shellforge as sf
+
+    called = {}
+
+    def fake_interactive(*, show_banner=True, sf=None):
+        called["ok"] = True
+        called["banner"] = show_banner
+        return 0
+
+    monkeypatch.setattr(interactive_mod, "run_interactive", fake_interactive)
+
+    rc = sf.main(["-m"])
+    assert rc == 0
+    assert called == {"ok": True, "banner": True}
+
+
+# --- Web shell tests ---
+
+from generators.webshell import (  # noqa: E402
+    WEBSHELL_LANGS,
+    WebShellGenerator,
+    list_webshell_languages,
+)
+
+# Expected execution indicators per language (at least one must appear)
+WEBSHELL_INDICATORS = {
+    "php": ("system", "shell_exec", "exec"),
+    "php5": ("system", "shell_exec", "exec"),
+    "asp": ("eval", "Exec", "WScript"),
+    "aspx": ("Process", "cmd.exe", "Start"),
+    "jsp": ("Runtime", "exec", "Process"),
+    "jspx": ("Runtime", "exec", "Process"),
+    "perl": ("param", "`", "CGI"),
+    "python": ("os.popen", "os.system", "cgi"),
+    "ruby": ("`", "CGI", "cmd"),
+    "cfm": ("cfexecute", "execute"),
+    "nodejs": ("exec", "child_process"),
+}
+
+
+@pytest.mark.parametrize("lang", list(WEBSHELL_LANGS.keys()))
+def test_webshell_minimal_nonempty_and_exec(lang: str) -> None:
+    gen = WebShellGenerator(lang)
+    payload = gen.minimal()
+    assert isinstance(payload, str)
+    assert payload.strip() != ""
+    assert gen.file_extension().startswith(".")
+    indicators = WEBSHELL_INDICATORS[lang]
+    assert any(ind in payload for ind in indicators), (
+        f"{lang} minimal missing indicators {indicators}"
+    )
+
+
+@pytest.mark.parametrize("lang", list(WEBSHELL_LANGS.keys()))
+def test_webshell_full_has_form_and_exec(lang: str) -> None:
+    gen = WebShellGenerator(lang)
+    payload = gen.full()
+    assert payload.strip() != ""
+    indicators = WEBSHELL_INDICATORS[lang]
+    assert any(ind in payload for ind in indicators)
+    # Full variants should be more substantial than minimal
+    assert len(payload) >= len(gen.minimal())
+
+
+def test_webshell_extension_mapping() -> None:
+    expected = {
+        "php": ".php",
+        "php5": ".php5",
+        "asp": ".asp",
+        "aspx": ".aspx",
+        "jsp": ".jsp",
+        "jspx": ".jspx",
+        "perl": ".pl",
+        "python": ".py",
+        "ruby": ".rb",
+        "cfm": ".cfm",
+        "nodejs": ".js",
+    }
+    for lang, ext in expected.items():
+        assert WebShellGenerator(lang).file_extension() == ext
+
+
+def test_webshell_cli_writes_file(tmp_path) -> None:
+    import shellforge as sf
+
+    out = tmp_path / "shell.php"
+    rc = sf.main(
+        [
+            "-t",
+            "webshell",
+            "-l",
+            "php",
+            "--variant",
+            "minimal",
+            "-o",
+            str(out),
+            "--no-banner",
+        ]
+    )
+    assert rc == 0
+    assert out.exists()
+    text = out.read_text(encoding="utf-8")
+    assert "system" in text
+    assert "cmd" in text
+
+
+def test_list_webshell_languages() -> None:
+    langs = list_webshell_languages()
+    assert "php" in langs
+    assert "aspx" in langs
+    assert "nodejs" in langs

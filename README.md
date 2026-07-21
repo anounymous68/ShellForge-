@@ -14,7 +14,7 @@ During CTFs and lab pentests I kept opening the same tabs — revshells.com, Pay
 
 > **Authorized use only**
 >
-> Use ShellForge only on systems you own or have explicit written permission to test. That means CTF targets, home labs, and scoped red team / pentest work. Running these payloads against anything else is illegal. You are responsible for how you use this tool.
+> Use ShellForge only on systems you own or have explicit written permission to test. That means CTF targets, home labs, learning setups, and scoped red team / pentest work. Running these payloads against anything else is illegal. Web shells need write access to a target web root and are for authorized testing only. You are responsible for how you use this tool.
 
 ## Features
 
@@ -24,6 +24,10 @@ During CTFs and lab pentests I kept opening the same tabs — revshells.com, Pay
 - Encoders: base64, URL-encode, PowerShell `-EncodedCommand`
 - `--listener` prints `nc`, `rlwrap`, `socat`, and an msfconsole multi/handler snippet
 - New languages plug in via `generators/` plus a line in the `LANGUAGES` dict
+
+### Web shells
+
+Upload-style shells for labs where you have write access to a web root: PHP, PHP5, ASP, ASPX, JSP, JSPX, Perl CGI, Python CGI, Ruby CGI, ColdFusion (CFM), and Node.js. Each language has a `minimal` one-liner and a `full` browser form (`--variant`).
 
 ## Installation
 
@@ -79,6 +83,14 @@ List everything the tool knows about:
 
 ```bash
 python shellforge.py --list-langs
+python shellforge.py -t webshell --list-langs
+```
+
+Web shell (save to file — minimal one-liner or full browser form):
+
+```bash
+python shellforge.py -t webshell -l php --variant full -o shell.php
+python shellforge.py -t webshell -l aspx --variant minimal -o shell.aspx
 ```
 
 More walkthroughs live in [`examples/usage_examples.md`](examples/usage_examples.md).
